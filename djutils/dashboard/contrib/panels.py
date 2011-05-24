@@ -1,3 +1,5 @@
+import socket
+
 from django.conf import settings
 
 from djutils.dashboard.provider import PanelProvider
@@ -13,6 +15,8 @@ def get_db_setting(key):
         return settings.DATABASES['default'][key]
     except KeyError:
         return getattr(settings, 'DATABASE_%s' % key)
+
+REDIS_SERVER = getattr(settings, 'QUEUE_CONNECTION', 'localhost:6379:0')
 
 
 class PostgresPanelProvider(PanelProvider):
@@ -136,6 +140,49 @@ class PostgresConnectionsForDatabase(PostgresPanelProvider):
             data_dict[row[0]] = row[1]
         
         return data_dict
+
+
+class RedisPanelProvider(PanelProvider):
+    def get_info(self):
+        host, port = REDIS_SERVER.split(':')[:2]
+        sock = socket.socket()
+        try:
+            sock.connect((host, int(port)))
+        except:
+            return {}
+        
+        sock.send('INFO\r\n')
+        data = sock.recv(4096)
+        data_dict = {}
+        for line in data.splitlines():
+            if ':' in line:
+                key, val = line.split(':', 1)
+                data_dict[key] = val
+        
+        return data_dict
+    
+    def get_key(self, key):
+        return self.get_info().get(key, 0)
+
+
+class RedisConnectedClients(RedisPanelProvider):
+    def get_title(self):
+        return 'Redis connections'
+    
+    def get_data(self):
+        return {'clients': self.get_key('connected_clients')}
+
+
+class RedisMemoryUsage(RedisPanelProvider):
+    def get_title(self):
+        return 'Redis memory usage'
+    
+    def get_data(self):
+        return {'memory': self.get_key('used_memory')}
+
+
+registry.register(RedisConnectedClients)
+registry.register(RedisMemoryUsage)
 
 
 if 'psycopg2' in get_db_setting('ENGINE'):
