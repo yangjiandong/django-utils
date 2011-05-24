@@ -73,8 +73,13 @@ Dashboard.prototype.plot_data = function() {
       var data_length = label_data.length;
       
       /* only display the most recent `num_points` items */
-      for (var i = (data_length - this.num_points); i < data_length; i++)
-        normalized.push([i, label_data[i][1]]);
+      for (var i = (data_length - this.num_points); i < data_length; i++) {
+        if (label_data[i]) {
+          normalized.push([i, label_data[i][1]]);
+        } else {
+          normalized.push([i, 0]);
+        }
+      }
     
       /* remove ids we no longer care about */
       for (var i = 0; i < data_length; i++) {
