@@ -16,7 +16,6 @@ def update_panels():
     """
     Simple task which updates the dashboard panels every minute
     """
-    import pdb; pdb.set_trace()
     Panel.objects.update_panels()
 
 @periodic_command(crontab(minute=0, hour='*'))
