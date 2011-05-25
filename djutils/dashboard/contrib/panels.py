@@ -20,6 +20,9 @@ def get_db_setting(key):
 # stored as either 'localhost:6379' or 'localhost:6379:0'
 REDIS_SERVER = getattr(settings, 'DASHBOARD_REDIS_CONNECTION', None)
 
+# stored as 'localhost:11211'
+MEMCACHED_SERVER = getattr(settings, 'DASHBOARD_MEMCACHED_CONNECTION', None)
+
 
 class PostgresPanelProvider(PanelProvider):
     conn = None
@@ -184,9 +187,88 @@ class RedisMemoryUsage(RedisPanelProvider):
         return {'memory': self.get_key('used_memory')}
 
 
+class CPUInfo(PanelProvider):
+    def get_title(self):
+        return 'CPU Usage'
+    
+    def get_data(self):
+        fh = open('/proc/loadavg', 'r')
+        contents = fh.read()
+        fh.close()
+        
+        # grab the second value
+        second = contents.split()[1]
+        
+        return {'loadavg': second}
+
+
+class MemcachedPanelProvider(PanelProvider):
+    def get_stats(self):
+        host, port = MEMCACHED_SERVER.split(':')[:2]
+        sock = socket.socket()
+        try:
+            sock.connect((host, int(port)))
+        except:
+            return {}
+        
+        sock.send('stats\r\n')
+        data = sock.recv(8192)
+        data_dict = {}
+        for line in data.splitlines():
+            if line.startswith('STAT'):
+                key, val = line.split()[1:]
+                data_dict[key] = val
+        
+        return data_dict
+
+
+class MemcachedHitMiss(MemcachedPanelProvider):
+    def get_title(self):
+        return 'Memcached hit/miss ratio'
+    
+    def get_data(self):
+        memcached_stats = self.get_stats()
+        
+        get_hits = float(memcached_stats.get('get_hits', 0))
+        get_misses = float(memcached_stats.get('get_misses', 0))
+        
+        if get_hits and get_misses:
+            return {'hit-miss ratio': get_hits / get_misses}
+        
+        return {'hit-miss-ration': 0}
+
+
+class MemcachedMemoryUsage(MemcachedPanelProvider):
+    def get_title(self):
+        return 'Memcached memory usage'
+    
+    def get_data(self):
+        memcached_stats = self.get_stats()
+        
+        return {'bytes': memcached_stats.get('bytes', 0)}
+
+
+class MemcachedItemsInCache(MemcachedPanelProvider):
+    def get_title(self):
+        return 'Memcached items in cache'
+    
+    def get_data(self):
+        memcached_stats = self.get_stats()
+        return {'items': memcached_stats.get('curr_items', 0)}
+
+
+registry.register(CPUInfo)
+
+
 if REDIS_SERVER:
     registry.register(RedisConnectedClients)
     registry.register(RedisMemoryUsage)
+
+
+if MEMCACHED_SERVER:
+    registry.register(MemcachedHitMiss)
+    registry.register(MemcachedMemoryUsage)
+    registry.register(MemcachedItemsInCache)
 
 
 if 'psycopg2' in get_db_setting('ENGINE'):
