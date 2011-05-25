@@ -7,9 +7,9 @@
   <script type="text/javascript">
     jQuery(document).ready(function($) {
       /* create 3 instances of the dashboard updater for the 3 aggregate types */
-      var d_m = new Dashboard('{% url djutils_dashboard_data_minute %}', 'minute', 10),
-          d_h = new Dashboard('{% url djutils_dashboard_data_hour %}', 'hour', 60*60),
-          d_d = new Dashboard('{% url djutils_dashboard_data_day %}', 'day', 24*60*60);
+      var d_m = new Dashboard('{% url djutils_dashboard_data_minute %}', 'minute', 30),/* every 30s */
+          d_h = new Dashboard('{% url djutils_dashboard_data_hour %}', 'hour', 60*15), /* every 15 mins */
+          d_d = new Dashboard('{% url djutils_dashboard_data_day %}', 'day', 4*60*60); /* every 4 hours */
     });
   </script>
   
@@ -29,14 +29,14 @@
         </div>
       </div>
       <div class="panel hour">
-        <h3>{{ panel.title }}</h3>
+        <h3>{{ panel.title }} (hourly)</h3>
         <div class="panel-data panel-data-hour" id="dashboard-hour-{{ panel.id }}">
         </div>
       </div>
       {# uncomment to show the day panel in the dashboard #}
       {% comment %}
       <div class="panel day">
-        <h3>{{ panel.title }}</h3>
+        <h3>{{ panel.title }} (daily)</h3>
         <div class="panel-data panel-data-day" id="dashboard-day-{{ panel.id }}">
         </div>
       </div>
