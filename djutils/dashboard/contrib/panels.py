@@ -30,7 +30,8 @@ class PostgresPanelProvider(PanelProvider):
     def get_conn(self):
         return psycopg2.connect(
             database=get_db_setting('NAME'),
-            user=get_db_setting('USER') or 'postgres'
+            user=get_db_setting('USER') or 'postgres',
+            host=get_db_setting('HOST') or 'localhost',
         )
     
     def execute(self, sql, params=None):
