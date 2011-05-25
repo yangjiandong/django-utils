@@ -101,6 +101,14 @@ def throttle(methods_or_func, limit=3, duration=900):
     
     return decorator
 
+def staff_required(func):
+    @wraps(func)
+    def inner(request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise Http404('Must be a staff user to access this url')
+        return func(request, *args, **kwargs)
+    return inner
+
 def memoize(func):
     func._memoize_cache = {}
     @wraps(func)
