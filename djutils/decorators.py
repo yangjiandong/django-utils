@@ -6,7 +6,7 @@ import threading
 
 from django.conf import settings
 from django.core.cache import cache
-from django.http import HttpResponseForbidden, HttpResponseRedirect
+from django.http import HttpResponseForbidden, HttpResponseRedirect, Http404
 from django.utils.functional import wraps
 
 from djutils.cache import key_from_args
