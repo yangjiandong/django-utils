@@ -33,11 +33,14 @@
         <div class="panel-data panel-data-hour" id="dashboard-hour-{{ panel.id }}">
         </div>
       </div>
+      {# uncomment to show the day panel in the dashboard #}
+      {% comment %}
       <div class="panel day">
         <h3>{{ panel.title }}</h3>
         <div class="panel-data panel-data-day" id="dashboard-day-{{ panel.id }}">
         </div>
       </div>
+      {% endcomment %}
     {% endfor %}
   </div>
 {% endblock %}

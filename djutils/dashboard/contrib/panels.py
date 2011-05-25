@@ -16,7 +16,9 @@ def get_db_setting(key):
     except KeyError:
         return getattr(settings, 'DATABASE_%s' % key)
 
-REDIS_SERVER = getattr(settings, 'QUEUE_CONNECTION', 'localhost:6379:0')
+
+# stored as either 'localhost:6379' or 'localhost:6379:0'
+REDIS_SERVER = getattr(settings, 'DASHBOARD_REDIS_CONNECTION', None)
 
 
 class PostgresPanelProvider(PanelProvider):
@@ -67,7 +69,7 @@ class PostgresQueryPanel(PostgresPanelProvider):
 
 class PostgresUserPanel(PostgresPanelProvider):
     def get_title(self):
-        return 'Postgres Connections by User'
+        return 'Postgres connections by User'
     
     def get_data(self):
         cursor = self.execute('SELECT usename, count(*) FROM pg_stat_activity WHERE procpid != pg_backend_pid() GROUP BY usename ORDER BY 1;')
@@ -82,7 +84,7 @@ class PostgresUserPanel(PostgresPanelProvider):
 
 class PostgresConnectionsPanel(PostgresPanelProvider):
     def get_title(self):
-        return 'Postgres connections'
+        return 'Postgres connections by Type'
     
     def get_data(self):
         sql = """
@@ -118,7 +120,7 @@ class PostgresConnectionsPanel(PostgresPanelProvider):
 
 class PostgresConnectionsForDatabase(PostgresPanelProvider):
     def get_title(self):
-        return 'Database connections'
+        return 'Connections for site db'
     
     def get_data(self):
         sql = """
@@ -181,8 +183,9 @@ class RedisMemoryUsage(RedisPanelProvider):
         return {'memory': self.get_key('used_memory')}
 
 
-registry.register(RedisConnectedClients)
-registry.register(RedisMemoryUsage)
+if REDIS_SERVER:
+    registry.register(RedisConnectedClients)
+    registry.register(RedisMemoryUsage)
 
 
 if 'psycopg2' in get_db_setting('ENGINE'):

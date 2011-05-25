@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 from django.views.generic.simple import direct_to_template
 
 from djutils.dashboard.models import Panel, PanelData, PANEL_AGGREGATE_MINUTE
+from djutils.decorators import staff_required
 from djutils.utils.http import json_response
 
 
@@ -29,6 +30,7 @@ def serialize_panel_data(panels_and_data):
     
     return payload
 
+@staff_required
 def dashboard_data_endpoint(request, data_type=PANEL_AGGREGATE_MINUTE):
     panels = Panel.objects.get_panels()
     
@@ -47,6 +49,7 @@ def dashboard_data_endpoint(request, data_type=PANEL_AGGREGATE_MINUTE):
     
     return json_response(payload)
 
+@staff_required
 def dashboard(request):    
     return direct_to_template(request, 'dashboard/dashboard_index.html', {
         'panel_list': Panel.objects.get_panels(),
