@@ -2,9 +2,11 @@ import datetime
 
 from django.conf import settings
 
+from djutils import dashboard
 from djutils.dashboard.models import Panel, PanelData
 from djutils.queue.decorators import periodic_command, crontab
 
+dashboard.autodiscover()
 
 # set to 0 or None to prevent data from expiring
 EXPIRATION_DAYS = getattr(settings, 'PANEL_DATA_EXPIRATION_DAYS', 7)
@@ -14,6 +16,7 @@ def update_panels():
     """
     Simple task which updates the dashboard panels every minute
     """
+    import pdb; pdb.set_trace()
     Panel.objects.update_panels()
 
 @periodic_command(crontab(minute=0, hour='*'))
