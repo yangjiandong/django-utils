@@ -33,4 +33,4 @@ def remove_old_panel_data():
     """
     if EXPIRATION_DAYS:
         cutoff = datetime.datetime.now() - datetime.timedelta(days=EXPIRATION_DAYS)
-        Paneldata.objects.filter(created_date__lte=cutoff).delete()
+        PanelData.objects.filter(created_date__lte=cutoff).delete()
