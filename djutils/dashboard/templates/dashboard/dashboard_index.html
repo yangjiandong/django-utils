@@ -23,24 +23,29 @@
 {% block content %}
   <div id="dashboard">
     {% for panel in panel_list %}
-      <div class="panel minute">
-        <h3>{{ panel.title }}</h3>
-        <div class="panel-data panel-data-minute" id="dashboard-minute-{{ panel.id }}">
+      <div class="panel-group">
+        <div class="panel minute">
+          <h3>{{ panel.title }}</h3>
+          <div class="panel-data panel-data-minute" id="dashboard-minute-{{ panel.id }}">
+          </div>
+          <div class="panel-legend" id="legend-minute-{{ panel.id }}"></div>
         </div>
-      </div>
-      <div class="panel hour">
-        <h3>{{ panel.title }} (hourly)</h3>
-        <div class="panel-data panel-data-hour" id="dashboard-hour-{{ panel.id }}">
+        <div class="panel hour">
+          <h3>{{ panel.title }} (hourly)</h3>
+          <div class="panel-data panel-data-hour" id="dashboard-hour-{{ panel.id }}">
+          </div>
+          <div class="panel-legend" id="legend-hour-{{ panel.id }}"></div>
         </div>
-      </div>
-      {# uncomment to show the day panel in the dashboard #}
-      {% comment %}
-      <div class="panel day">
-        <h3>{{ panel.title }} (daily)</h3>
-        <div class="panel-data panel-data-day" id="dashboard-day-{{ panel.id }}">
+        {# uncomment to show the day panel in the dashboard #}
+        {% comment %}
+        <div class="panel day">
+          <h3>{{ panel.title }} (daily)</h3>
+          <div class="panel-data panel-data-day" id="dashboard-day-{{ panel.id }}">
+          </div>
+          <div class="panel-legend" id="legend-day-{{ panel.id }}"></div>
         </div>
+        {% endcomment %}
       </div>
-      {% endcomment %}
     {% endfor %}
   </div>
 {% endblock %}

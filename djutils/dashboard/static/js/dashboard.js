@@ -92,6 +92,13 @@ Dashboard.prototype.plot_data = function() {
         'data': normalized
       });
     }
-    $.plot($('#dashboard-' + this.selector_key + '-' + panel_id), panel_data, {xaxis: {ticks: []}});
+    $.plot($('#dashboard-' + this.selector_key + '-' + panel_id), panel_data, {
+      xaxis: {ticks: []},
+      legend: {
+        show: true,
+        noColumns: 4,
+        container: $('#legend-' + this.selector_key + '-' + panel_id)
+      }
+    });
   }
 };
