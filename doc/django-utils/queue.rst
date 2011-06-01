@@ -50,7 +50,7 @@ Here's how you might call your function::
         return HttpResponse('Churning in background task added to queue')
 
 Whenever the view gets called, the function will be enqueued for execution.
-Meanwhile the :class:`QueueDaemon` consumer will pick it up and execute it in a separate
+Meanwhile the :class:`QueueConsumer` will pick it up and execute it in a separate
 process.
 
 When the consumer picks up the message, it will churn your data!
@@ -164,17 +164,22 @@ To manually discover commands, execute::
 Consuming Messages
 ------------------
 
-.. py:module:: djutils.queue.bin.consumer
+.. py:module:: djutils.management.commands.queue_consumer
 
-The :mod:`djutils.queue.bin.consumer` module contains the daemon that will
-consume your queue.  This is a "proper" linux daemon, and is based on the
-python code found in `this blog post <http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/>`_.
+The :mod:`djutils.management.commands.queue_consumer` management command consumes
+messages from the queue and delegates the work to an arbitrary number of worker
+threads.  The consumer runs in the foreground.
 
 To run the consumer, you will need to ensure that two environment variables
 are properly set:
 
     * PYTHONPATH: a list of directories in which to find python packages
     * DJANGO_SETTINGS_MODULE: the location of the settings file your django project uses
+
+Then it is as simple as::
+
+    django-admin.py queue_consumer
+
 
 Useful consumer switches
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -190,6 +195,9 @@ Useful consumer switches
     periodic tasks feel free to turn this off.  Also, if you plan on running multiple
     consumers, only one should be enqueueing periodic tasks.
 
+"-l" or "--logfile"
+    specifies where to store logfile
+
 
 Example assuming you use virtualenv
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -198,11 +206,8 @@ Example assuming you use virtualenv
 
     # assume your cwd is the root dir of virtualenv
     export DJANGO_SETTINGS_MODULE=mysite.settings
-    ./bin/python ./src/djutils/djutils/queue/bin/consumer.py start -l ./logs/queue.log -p ./run/queue.pid
-    
-    -- stopping --
-    
-    ./bin/python ./src/djutils/djutils/queue/bin/consumer.py stop -l ./logs/queue.log -p ./run/queue.pid
+    django-admin.py queue_consumer -l ./logs/queue.log
+
 
 Example running as root
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -212,11 +217,39 @@ Example running as root
     sudo su
     export PYTHONPATH=/path/to/site/:/path/to/djutils/:$PYTHONPATH
     export DJANGO_SETTINGS_MODULE=mysite.settings
-    python djutils/bin/consumer.py start
-    
-    -- stopping --
-    
-    python djutils/bin/consumer.py stop
+    django-admin.py queue_consumer --logfile=/var/log/site-queue.log --threads=4
+
+
+Sample supervisord script
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+My person preference is to run the queue with a process manager like `supervisor <http://supervisord.org/>`_.
+Here's what my script looks like::
+
+    [program:queue_spiders]
+    environment=PYTHONPATH="/home/code/envs/spiders/:$PYTHONPATH"
+    directory=/home/code/envs/spiders/
+    command=/home/code/envs/spiders/bin/django-admin.py queue_consumer --settings=spiders.settings -l logs/queue.log --verbosity=2 -t 2
+    user=code
+    autostart=true
+    autorestart=true
+
+
+What happens if one of my tasks blows up?
+-----------------------------------------
+
+The consumer will maintain as many worker threads as you specify.  If an error
+occurs while processing a message, the following occurs:
+
+* the error and traceback are logged, along with the thread id of the worker
+* that worker is taken out of the pool
+* a new worker is started up to replace it
+
+The message itself, though, is gone forever.  If you want to receive an error
+email whenever a task dies, I'd recommend checking out the `new django logging
+handlers <https://docs.djangoproject.com/en/dev/topics/logging/>`_ -- you can
+configure the `djutils.queue.logger` to use the mail_admins handler for loglevel
+of ERROR.
 
 
 Backends
