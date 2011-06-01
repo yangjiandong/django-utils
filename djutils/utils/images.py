@@ -1,4 +1,11 @@
-import Image
+try:
+    import Image
+except ImportError:
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+
 try:
     from cStringIO import StringIO
 except ImportError:
