@@ -39,3 +39,11 @@ def generic_autodiscover(module_name):
             continue
         import_module('%s.%s' % (app, module_name))
         app_path = sys.modules['%s.%s' % (app, module_name)]
+
+
+class ObjectDict(dict):
+    def __getattr__(self, attname):
+        try:
+            return self[attname]
+        except KeyError:
+            raise AttributeError('%s has no attribute named "%s"' % (self, attname))
