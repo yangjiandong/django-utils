@@ -208,7 +208,7 @@ class Command(BaseCommand):
             if self.delay > self.max_delay:
                 self.delay = self.max_delay
             
-            self.logger.info('No messages, sleeping for: %s' % self.delay)
+            self.logger.debug('No messages, sleeping for: %s' % self.delay)
             
             time.sleep(self.delay)
             self.delay *= self.backoff_factor
@@ -216,12 +216,12 @@ class Command(BaseCommand):
     def enqueue_periodic_commands(self):
         while True:
             start = time.time()
-            self.logger.info('Enqueueing periodic commands')
+            self.logger.debug('Enqueueing periodic commands')
             
             try:
                 invoker.enqueue_periodic_commands()
             except:
-                self.logger.error('periodic command error, exiting', exc_info=1)
+                self.logger.error('Error enqueueing periodic commands', exc_info=1)
                 raise
             
             end = time.time()
