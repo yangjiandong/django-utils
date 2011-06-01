@@ -85,7 +85,7 @@ class Command(BaseCommand):
         # initialize delay
         self.delay = self.default_delay
         
-        self.logger = self.get_logger(options.verbosity)
+        self.logger = self.get_logger(int(options.verbosity))
         
         # queue to track messages to be processed
         self._queue = Queue.Queue()
