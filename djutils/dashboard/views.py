@@ -30,7 +30,13 @@ def serialize_panel_data(panels_and_data):
     
     return payload
 
-@staff_required
+def dashboard_security(func):
+    if getattr(settings, 'DASHBOARD_NO_SECURITY', False):
+        return func
+    else:
+        return staff_required(func)
+
+@dashboard_security
 def dashboard_data_endpoint(request, data_type=PANEL_AGGREGATE_MINUTE):
     panels = Panel.objects.get_panels()
     
@@ -49,7 +55,7 @@ def dashboard_data_endpoint(request, data_type=PANEL_AGGREGATE_MINUTE):
     
     return json_response(payload)
 
-@staff_required
+@dashboard_security
 def dashboard(request):    
     return direct_to_template(request, 'dashboard/dashboard_index.html', {
         'panel_list': Panel.objects.get_panels(),
