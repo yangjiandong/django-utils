@@ -197,9 +197,9 @@ class CPUInfo(PanelProvider):
         fh.close()
         
         # grab the second value
-        second = contents.split()[1]
+        first = contents.split()[0]
         
-        return {'loadavg': second}
+        return {'loadavg': first}
 
 
 class MemcachedPanelProvider(PanelProvider):
