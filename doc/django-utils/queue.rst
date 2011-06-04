@@ -1,6 +1,8 @@
 Queue
 =====
 
+.. py:module:: djutils.queue
+
 A simple task queue and consumer to make processing tasks out-of-band painless.
 Ideal for sending email, checking items for spam, generating thumbnails, etc.
 

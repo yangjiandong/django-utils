@@ -17,6 +17,7 @@ Contents:
    django-utils/getting_started
    django-utils/cache
    django-utils/daemon
+   django-utils/dashboard/index
    django-utils/db
    django-utils/decorators
    django-utils/middleware
