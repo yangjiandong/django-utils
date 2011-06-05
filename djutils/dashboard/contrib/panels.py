@@ -16,12 +16,34 @@ def get_db_setting(key):
     except KeyError:
         return getattr(settings, 'DATABASE_%s' % key)
 
+def make_a_list(whatever):
+    if isinstance(whatever, basestring):
+        return [whatever]
+    return whatever
 
-# stored as either 'localhost:6379' or 'localhost:6379:0'
-REDIS_SERVER = getattr(settings, 'DASHBOARD_REDIS_CONNECTION', None)
 
-# stored as 'localhost:11211'
-MEMCACHED_SERVER = getattr(settings, 'DASHBOARD_MEMCACHED_CONNECTION', None)
+# stored as either 'localhost:6379' or 'localhost:6379:0' -- this can be a
+# single server or a list of multiple servers
+REDIS_SERVERS = make_a_list(getattr(settings, 'DASHBOARD_REDIS_CONNECTION', None))
+
+# stored as 'localhost:11211' -- this can be either a single server or
+# a list of multiple
+MEMCACHED_SERVERS = make_a_list(getattr(settings, 'DASHBOARD_MEMCACHED_CONNECTION', None))
+
+
+class CPUInfo(PanelProvider):
+    def get_title(self):
+        return 'CPU Usage'
+    
+    def get_data(self):
+        fh = open('/proc/loadavg', 'r')
+        contents = fh.read()
+        fh.close()
+        
+        # grab the second value
+        first = contents.split()[0]
+        
+        return {'loadavg': first}
 
 
 class PostgresPanelProvider(PanelProvider):
@@ -35,6 +57,7 @@ class PostgresPanelProvider(PanelProvider):
             database=get_db_setting('NAME'),
             user=get_db_setting('USER') or 'postgres',
             host=get_db_setting('HOST') or 'localhost',
+            password=get_db_setting('PASSWORD') or '',
         )
     
     def execute(self, sql, params=None):
@@ -149,8 +172,7 @@ class PostgresConnectionsForDatabase(PostgresPanelProvider):
 
 
 class RedisPanelProvider(PanelProvider):
-    def get_info(self):
-        host, port = REDIS_SERVER.split(':')[:2]
+    def get_info(self, host, port):
         sock = socket.socket()
         try:
             sock.connect((host, int(port)))
@@ -160,51 +182,51 @@ class RedisPanelProvider(PanelProvider):
         sock.send('INFO\r\n')
         data = sock.recv(4096)
         data_dict = {}
+
         for line in data.splitlines():
             if ':' in line:
                 key, val = line.split(':', 1)
                 data_dict[key] = val
         
         return data_dict
-    
-    def get_key(self, key):
-        return self.get_info().get(key, 0)
+
+    def get_key(self):
+        raise NotImplementedError('Subclasses should implement this')
+
+    def get_key_for_connection(self, conn, key):
+        host, port = conn.split(':')[:2]
+        return self.get_info(host, int(port)).get(key, 0)
+
+    def get_data(self):
+        key = self.get_key()
+        data_dict = {}
+
+        for server in REDIS_SERVERS:
+            data_dict[server] = self.get_key_for_connection(server, key)
+
+        return data_dict
 
 
 class RedisConnectedClients(RedisPanelProvider):
     def get_title(self):
         return 'Redis connections'
     
-    def get_data(self):
-        return {'clients': self.get_key('connected_clients')}
+    def get_key(self):
+        return 'connected_clients'
 
 
 class RedisMemoryUsage(RedisPanelProvider):
     def get_title(self):
         return 'Redis memory usage'
     
-    def get_data(self):
-        return {'memory': self.get_key('used_memory')}
-
-
-class CPUInfo(PanelProvider):
-    def get_title(self):
-        return 'CPU Usage'
-    
-    def get_data(self):
-        fh = open('/proc/loadavg', 'r')
-        contents = fh.read()
-        fh.close()
-        
-        # grab the second value
-        first = contents.split()[0]
-        
-        return {'loadavg': first}
+    def get_key(self):
+        return 'used_memory'
 
 
 class MemcachedPanelProvider(PanelProvider):
-    def get_stats(self):
-        host, port = MEMCACHED_SERVER.split(':')[:2]
+    def get_stats(self, conn):
+        host, port = conn.split(':')
+
         sock = socket.socket()
         try:
             sock.connect((host, int(port)))
@@ -227,15 +249,20 @@ class MemcachedHitMiss(MemcachedPanelProvider):
         return 'Memcached hit/miss ratio'
     
     def get_data(self):
-        memcached_stats = self.get_stats()
+        data_dict = {}
+
+        for server in MEMCACHED_SERVERS:
+            memcached_stats = self.get_stats(server)
         
-        get_hits = float(memcached_stats.get('get_hits', 0))
-        get_misses = float(memcached_stats.get('get_misses', 0))
+            get_hits = float(memcached_stats.get('get_hits', 0))
+            get_misses = float(memcached_stats.get('get_misses', 0))
+            
+            if get_hits and get_misses:
+                data_dict[server] = get_hits/get_misses
+            else:
+                data_dict[server] = 0
         
-        if get_hits and get_misses:
-            return {'hit-miss ratio': get_hits / get_misses}
-        
-        return {'hit-miss-ration': 0}
+        return data_dict
 
 
 class MemcachedMemoryUsage(MemcachedPanelProvider):
@@ -243,9 +270,13 @@ class MemcachedMemoryUsage(MemcachedPanelProvider):
         return 'Memcached memory usage'
     
     def get_data(self):
-        memcached_stats = self.get_stats()
-        
-        return {'bytes': memcached_stats.get('bytes', 0)}
+        data_dict = {}
+
+        for server in MEMCACHED_SERVERS:
+            memcached_stats = self.get_stats(server)
+            data_dict[server] = memcached_stats.get('bytes', 0)
+
+        return data_dict
 
 
 class MemcachedItemsInCache(MemcachedPanelProvider):
@@ -253,19 +284,24 @@ class MemcachedItemsInCache(MemcachedPanelProvider):
         return 'Memcached items in cache'
     
     def get_data(self):
-        memcached_stats = self.get_stats()
-        return {'items': memcached_stats.get('curr_items', 0)}
+        data_dict = {}
+
+        for server in MEMCACHED_SERVERS:
+            memcached_stats = self.get_stats(server)
+            data_dict[server] = memcached_stats.get('curr_items', 0)
+
+        return data_dict
 
 
 registry.register(CPUInfo)
 
 
-if REDIS_SERVER:
+if REDIS_SERVERS:
     registry.register(RedisConnectedClients)
     registry.register(RedisMemoryUsage)
 
 
-if MEMCACHED_SERVER:
+if MEMCACHED_SERVERS:
     registry.register(MemcachedHitMiss)
     registry.register(MemcachedMemoryUsage)
     registry.register(MemcachedItemsInCache)
