@@ -3,7 +3,7 @@ import datetime
 from django.conf import settings
 
 from djutils import dashboard
-from djutils.dashboard.models import Panel, PanelData
+from djutils.dashboard.models import Panel, PanelData, PanelDataSet
 from djutils.queue.decorators import periodic_command, crontab
 
 dashboard.autodiscover()
@@ -33,4 +33,5 @@ def remove_old_panel_data():
     """
     if EXPIRATION_DAYS:
         cutoff = datetime.datetime.now() - datetime.timedelta(days=EXPIRATION_DAYS)
+        PanelDataSet.objects.filter(panel_data__created_date__lte=cutoff).delete()
         PanelData.objects.filter(created_date__lte=cutoff).delete()
