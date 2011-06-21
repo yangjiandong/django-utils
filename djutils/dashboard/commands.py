@@ -33,5 +33,15 @@ def remove_old_panel_data():
     """
     if EXPIRATION_DAYS:
         cutoff = datetime.datetime.now() - datetime.timedelta(days=EXPIRATION_DAYS)
-        PanelDataSet.objects.filter(panel_data__created_date__lte=cutoff).delete()
-        PanelData.objects.filter(created_date__lte=cutoff).delete()
+        
+        # try deleting these first so as not to load up the subsequent
+        # delete while collecting sub-objects
+        PanelDataSet.objects.filter(
+            panel_data__created_date__lte=cutoff,
+            panel_data__aggregate_type=PANEL_AGGREGATE_MINUTE,
+        ).delete()
+
+        PanelData.objects.filter(
+            created_date__lte=cutoff,
+            aggregate_type=PANEL_AGGREGATE_MINUTE,
+        ).delete()
