@@ -28,6 +28,7 @@ if not settings.configured:
             'django.contrib.contenttypes',
             'djutils',
             'djutils.tests',
+            'djutils.dashboard',
         ],
         SITE_ID = 1,
         CACHE_BACKEND = 'djutils.tests.cache_backend://',
@@ -35,6 +36,8 @@ if not settings.configured:
         IGNORE_THIS = 'testing',
         QUEUE_CLASS = 'djutils.queue.backends.database.DatabaseQueue',
         QUEUE_NAME = 'testqueue',
+        ROOT_URLCONF = 'djutils.dashboard.tests.urls',
+        DASHBOARD_NO_SECURITY = True,
     )
 
 from django.test.simple import run_tests
@@ -42,7 +45,7 @@ from django.test.simple import run_tests
 
 def runtests(*test_args):
     if not test_args:
-        test_args = ['djutils']
+        test_args = ['djutils', 'dashboard']
     parent = dirname(abspath(__file__))
     sys.path.insert(0, parent)
     failures = run_tests(test_args, verbosity=1, interactive=True)
