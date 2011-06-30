@@ -17,9 +17,7 @@ def download_remote_media(destination_dir):
             print 'making directory %s' % dest
             os.makedirs(dest)
         else:
-            fh = open(dest, 'w')
-            
             print 'downloading %s to %s' % (key.name, dest)
-            
+            fh = open(dest, 'w')
             key.get_contents_to_file(fh)
             fh.close()
