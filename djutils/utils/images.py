@@ -11,6 +11,8 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+import urllib
+
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
@@ -90,3 +92,18 @@ def crop(source, dest, x, y, w, h):
     
     source_file.close()
     default_storage.save(dest, ContentFile(img_buffer.getvalue()))
+
+def download_and_resize(url, width, height=None, filename=None):
+    """
+    Fetches a remote image, resizes it and saves it using the default storage
+    """
+    tmp_file, _ = urllib.urlretrieve(url)
+    img_obj = Image.open(open(tmp_file))
+    
+    # resize image file and retrieve buffer
+    img_buf, w, h = _resize(img_obj, width, height)
+    
+    if filename is None:
+        filename = url.rsplit('/', 1)[-1]
+    
+    return default_storage.save(filename, ContentFile(img_buf.getvalue()))
