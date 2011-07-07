@@ -3,7 +3,7 @@ import datetime
 from django.conf import settings
 
 from djutils import dashboard
-from djutils.dashboard.models import Panel, PanelData, PanelDataSet
+from djutils.dashboard.models import Panel, PanelData, PanelDataSet, PANEL_AGGREGATE_MINUTE
 from djutils.queue.decorators import periodic_command, crontab
 
 dashboard.autodiscover()
