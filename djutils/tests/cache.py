@@ -135,6 +135,6 @@ class CacheUtilsTestCase(TestCase):
         start = time.time()
         res = test_node.render(context)
         end = time.time()
-        print "\n\n%s\n\n" % (end-start)
-        self.assertTrue(.07 < end - start < .15)
+
+        self.assertTrue(.08 < end - start < .15)
         self.assertEqual(res, {'D': 'd'})

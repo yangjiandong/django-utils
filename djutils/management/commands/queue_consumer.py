@@ -130,25 +130,28 @@ class Command(BaseCommand):
     
     def start_processor_thread(self):
         self.logger.info('Starting processor thread')
-        return gevent.spawn(self.process_message)
+        return gevent.spawn(self.processor)
+    
+    def processor(self):
+        while 1:
+            self.process_message()
     
     def process_message(self):
-        while 1:
-            message = invoker.read()
+        message = invoker.read()
+        
+        if message:
+            self.logger.info('Processing: %s' % message)
+            self.delay = self.default_delay
+            self._queue.put(message)
+            self._queue.join()
+        else:
+            if self.delay > self.max_delay:
+                self.delay = self.max_delay
             
-            if message:
-                self.logger.info('Processing: %s' % message)
-                self.delay = self.default_delay
-                self._queue.put(message)
-                self._queue.join()
-            else:
-                if self.delay > self.max_delay:
-                    self.delay = self.max_delay
-                
-                self.logger.debug('No messages, sleeping for: %s' % self.delay)
-                
-                time.sleep(self.delay)
-                self.delay *= self.backoff_factor
+            self.logger.debug('No messages, sleeping for: %s' % self.delay)
+            
+            time.sleep(self.delay)
+            self.delay *= self.backoff_factor
     
     def start_scheduler(self):
         self.logger.info('Starting scheduler thread')

@@ -1,6 +1,6 @@
 import datetime
+import gevent
 import logging
-import threading
 import time
 
 from django.conf import settings
@@ -14,8 +14,8 @@ from djutils.queue.registry import registry
 from djutils.test import TestCase
 from djutils.utils.helpers import ObjectDict
 
-class DummyThreadQueue():
-    """A replacement for the stdlib Queue.Queue"""
+class DummyQueue():
+    """A replacement for the gevent JoinableQueue in use in the consumer"""
     def put(self, message):
         command = registry.get_command_for_message(message)
         command.execute()
@@ -32,7 +32,7 @@ class TestQueueConsumer(QueueConsumer):
     def initialize_options(self, options):
         super(TestQueueConsumer, self).initialize_options(options)
         
-        self._queue = DummyThreadQueue()
+        self._queue = DummyQueue()
 
 
 class UserCommand(QueueCommand):
