@@ -226,7 +226,7 @@ class DashboardTestCase(RequestFactoryTestCase):
     def test_dashboard_data_endpoints(self):
         self.create_data(how_much=120)
         
-        request = self.request_factory.request()
+        request = self.request_factory.get('/')
         
         response = dashboard_data_endpoint(request, 0)
         data = json.loads(response.content)

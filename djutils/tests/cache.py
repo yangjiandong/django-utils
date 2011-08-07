@@ -1,5 +1,5 @@
+import gevent
 import time
-import threading
 
 from django.conf import settings
 from django.core.cache import cache
@@ -124,18 +124,17 @@ class CacheUtilsTestCase(TestCase):
         
         # waste some time in a separate thread and repopulate the cache there
         def waste_time():
-            time.sleep(.08)
+            time.sleep(.09)
             cache.delete(repopulating)
             cache._cache[key] = ({'D': 'd'}, 0)
         
         # start the thread
-        time_waster = threading.Thread(target=waste_time)
-        time_waster.start()
+        gevent.spawn(waste_time)
         
         # this is janky, but check that the spin lock spins for just one loop
         start = time.time()
         res = test_node.render(context)
         end = time.time()
-        
-        self.assertTrue(.1 < end - start < .15)
+        print "\n\n%s\n\n" % (end-start)
+        self.assertTrue(.07 < end - start < .15)
         self.assertEqual(res, {'D': 'd'})
