@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+from gevent import monkey; monkey.patch_all()
 from os.path import dirname, abspath
 
 from django.conf import settings
