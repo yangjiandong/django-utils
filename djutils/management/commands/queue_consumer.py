@@ -4,6 +4,7 @@ from gevent import event, monkey, pool, queue; monkey.patch_all()
 import gevent
 import logging
 import os
+import signal
 import sys
 import time
 from logging.handlers import RotatingFileHandler
@@ -117,7 +118,7 @@ class Command(BaseCommand):
         return gevent.spawn(self.enqueue_periodic_commands)
 
     def enqueue_periodic_commands(self):
-        while True:
+        while 1:
             start = time.time()
             self.logger.debug('Enqueueing periodic commands')
             
@@ -125,7 +126,6 @@ class Command(BaseCommand):
                 invoker.enqueue_periodic_commands()
             except:
                 self.logger.error('Error enqueueing periodic commands', exc_info=1)
-                raise
             
             end = time.time()
             time.sleep(60 - (end - start))
@@ -187,6 +187,14 @@ class Command(BaseCommand):
             self.logger.error('exception encountered, exiting thread %s' % gevent.getcurrent(), exc_info=1)
             raise
     
+    def handle_signal(self, sig_num, frame):
+        self.logger.info('Received SIGTERM, shutting down')
+        self.shutdown()
+    
+    def set_signal_handler(self):
+        self.logger.info('Setting signal handler')
+        signal.signal(signal.SIGTERM, self.handle_signal)
+    
     def start(self):
         if self.periodic_commands:
             self.start_periodic_command_thread()
@@ -214,8 +222,12 @@ class Command(BaseCommand):
             klass for klass in registry._registry
         ]))
         
+        self.set_signal_handler()
+        
         try:
             self.start()
             self._shutdown.wait()
         except:
             self.logger.error('error', exc_info=1)
+        
+        self.logger.info('Shutdown...')
