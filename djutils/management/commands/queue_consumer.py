@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from gevent import monkey, pool, queue; monkey.patch_all()
+from gevent import event, monkey, pool, queue; monkey.patch_all()
 import gevent
 import logging
 import os
@@ -91,6 +91,8 @@ class Command(BaseCommand):
         # queue to track messages to be processed
         self._queue = queue.JoinableQueue()
         self._pool = pool.Pool(self.threads)
+        
+        self._shutdown = event.Event()
     
     def get_logger(self, verbosity=1):
         log = logging.getLogger('djutils.queue.logger')
@@ -134,6 +136,7 @@ class Command(BaseCommand):
     
     def processor(self):
         while 1:
+            self._pool.wait_available()
             self.process_message()
     
     def process_message(self):
@@ -142,7 +145,11 @@ class Command(BaseCommand):
         if message:
             self.logger.info('Processing: %s' % message)
             self.delay = self.default_delay
+            
+            # put the message into the queue for the scheduler
             self._queue.put(message)
+            
+            # wait to acknowledge receipt of the message
             self._queue.join()
         else:
             if self.delay > self.max_delay:
@@ -159,12 +166,13 @@ class Command(BaseCommand):
     
     def scheduler(self):
         while 1:
-            self._pool.wait_available()
-            
-            self.logger.debug('Fetching job from job queue.')
+            # fetch job from queue
             job = self._queue.get()
             
+            # spin up a worker with the given job
             self._pool.spawn(self.worker, job)
+            
+            # indicate receipt of the task
             self._queue.task_done()
     
     def worker(self, message):
@@ -178,6 +186,16 @@ class Command(BaseCommand):
             # log the error and raise, killing the worker
             self.logger.error('exception encountered, exiting thread %s' % gevent.getcurrent(), exc_info=1)
             raise
+    
+    def start(self):
+        if self.periodic_commands:
+            self.start_periodic_command_thread()
+        
+        self._scheduler = self.start_scheduler()
+        self._processor = self.start_processor_thread()
+    
+    def shutdown(self):
+        self._shutdown.set()
     
     def handle(self, *args, **options):
         """
@@ -197,11 +215,7 @@ class Command(BaseCommand):
         ]))
         
         try:
-            if self.periodic_commands:
-                self.start_periodic_command_thread()
-            
-            t = self.start_scheduler()
-            self.start_processor_thread()
-            t.join()
+            self.start()
+            self._shutdown.wait()
         except:
             self.logger.error('error', exc_info=1)
