@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+
 import logging
 import os
 import Queue
+import signal
 import sys
 import time
 import threading
@@ -15,6 +17,17 @@ from djutils.queue import autodiscover
 from djutils.queue.exceptions import QueueException
 from djutils.queue.queue import invoker, queue_name, registry
 from djutils.utils.helpers import ObjectDict
+
+
+class IterableQueue(Queue.Queue):
+    def __iter__(self):
+        return self
+    
+    def next(self):
+        result = self.get()
+        if result is StopIteration:
+            raise result
+        return result
 
 
 class Command(BaseCommand):
@@ -88,13 +101,10 @@ class Command(BaseCommand):
         self.logger = self.get_logger(int(options.verbosity))
         
         # queue to track messages to be processed
-        self._queue = Queue.Queue()
+        self._queue = IterableQueue()
+        self._pool = threading.BoundedSemaphore(self.threads)
         
-        # queue to track ids of threads that errored out
-        self._errors = Queue.Queue()
-        
-        # list of worker threads
-        self._threads = []
+        self._shutdown = threading.Event()
     
     def get_logger(self, verbosity=1):
         log = logging.getLogger('djutils.queue.logger')
@@ -114,95 +124,52 @@ class Command(BaseCommand):
         
         return log
     
-    def start_periodic_command_thread(self):
-        periodic_command_thread = threading.Thread(
-            target=self.enqueue_periodic_commands
-        )
-        periodic_command_thread.daemon = True
-        
-        self.logger.info('Starting periodic command execution thread')
-        periodic_command_thread.start()
-        
-        return periodic_command_thread
+    def spawn(self, func, *args, **kwargs):
+        t = threading.Thread(target=func, args=args, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+        return t
     
-    def _queue_worker(self):
-        """
-        A worker thread that will chew on dequeued messages
-        """
+    def start_periodic_command_thread(self):
+        self.logger.info('Starting periodic command execution thread')
+        return self.spawn(self.enqueue_periodic_commands)
+
+    def enqueue_periodic_commands(self):
         while 1:
-            message = self._queue.get()
-            self._queue.task_done()
+            start = time.time()
+            self.logger.debug('Enqueueing periodic commands')
             
             try:
-                command = registry.get_command_for_message(message)
-                command.execute()
-            except QueueException:
-                # log error
-                self.logger.warn('queue exception raised', exc_info=1)
+                invoker.enqueue_periodic_commands()
             except:
-                # put the thread's id into the queue of errors for removal
-                current = threading.current_thread()
-                self._errors.put(current.ident)
-                
-                # log the error and raise, killing the worker thread
-                self.logger.error('exception encountered, exiting thread %s' % current, exc_info=1)
-                raise
-    
-    def create_worker_thread(self):
-        thread = threading.Thread(target=self._queue_worker)
-        thread.daemon = True
-        thread.start()
-        self.logger.info('created thread "%s"' % (thread.ident))
-        return thread
-    
-    def remove_dead_worker(self, ident):
-        self.logger.info('removing thread "%s"' % (ident))
-        self._threads = [w for w in self._threads if w.ident != ident]
-    
-    def check_worker_health(self):
-        while not self._errors.empty():
-            error_ident = self._errors.get()
-            self.remove_dead_worker(error_ident)
+                self.logger.error('Error enqueueing periodic commands', exc_info=1)
             
-            self._errors.task_done()
-        
-        while len(self._threads) < self.threads:
-            self._threads.append(self.create_worker_thread())
-    
-    def initialize_threads(self):
-        self.check_worker_health()
-
-    def run_with_periodic_commands(self):
-        """
-        Pull messages from the queue so long as:
-        - no unhandled exceptions when dequeue-ing and processing messages
-        - no unhandled exceptions while enqueue-ing periodic commands
-        """
-        while 1:
-            t = self.start_periodic_command_thread()
+            end = time.time()
             
-            while t.is_alive():
-                self.check_worker_health()
-                self.process_message()
-            
-            self.logger.error('Periodic command thread died')
+            time.sleep(60 - (time.time() - start))
     
-    def run_only_queue(self):
-        """
-        Pull messages from the queue until shut down or an unhandled exception
-        is encountered while dequeue-ing and processing messages
-        """
-        while 1:
-            self.check_worker_health()
+    def start_processor(self):
+        self.logger.info('Starting processor thread')
+        return self.spawn(self.processor)
+    
+    def processor(self):
+        while not self._shutdown.is_set():
             self.process_message()
     
     def process_message(self):
         message = invoker.read()
         
         if message:
+            self._pool.acquire()
+            
             self.logger.info('Processing: %s' % message)
             self.delay = self.default_delay
+            
+            # put the message into the queue for the scheduler
             self._queue.put(message)
+            
+            # wait to acknowledge receipt of the message
+            self.logger.debug('Waiting for receipt of message')
             self._queue.join()
         else:
             if self.delay > self.max_delay:
@@ -213,19 +180,49 @@ class Command(BaseCommand):
             time.sleep(self.delay)
             self.delay *= self.backoff_factor
     
-    def enqueue_periodic_commands(self):
-        while True:
-            start = time.time()
-            self.logger.debug('Enqueueing periodic commands')
+    def start_scheduler(self):
+        self.logger.info('Starting scheduler thread')
+        return self.spawn(self.scheduler)
+    
+    def scheduler(self):
+        for job in self._queue:
+            # spin up a worker with the given job
+            self.spawn(self.worker, job)
             
-            try:
-                invoker.enqueue_periodic_commands()
-            except:
-                self.logger.error('Error enqueueing periodic commands', exc_info=1)
-                raise
-            
-            end = time.time()
-            time.sleep(60 - (end - start))
+            # indicate receipt of the task
+            self._queue.task_done()
+    
+    def worker(self, message):
+        try:
+            command = registry.get_command_for_message(message)
+            command.execute()
+        except QueueException:
+            # log error
+            self.logger.warn('queue exception raised', exc_info=1)
+        except:
+            # log the error and raise, killing the worker
+            self.logger.error('unhandled exception in worker thread', exc_info=1)
+        finally:
+            self._pool.release()
+    
+    def start(self):
+        if self.periodic_commands:
+            self.start_periodic_command_thread()
+        
+        self._scheduler = self.start_scheduler()
+        self._processor = self.start_processor()
+    
+    def shutdown(self):
+        self._shutdown.set()
+        self._queue.put(StopIteration)
+    
+    def handle_signal(self, sig_num, frame):
+        self.logger.info('Received SIGTERM, shutting down')
+        self.shutdown()
+    
+    def set_signal_handler(self):
+        self.logger.info('Setting signal handler')
+        signal.signal(signal.SIGTERM, self.handle_signal)
     
     def handle(self, *args, **options):
         """
@@ -244,10 +241,17 @@ class Command(BaseCommand):
             klass for klass in registry._registry
         ]))
         
+        self.set_signal_handler()
+        
         try:
-            if self.periodic_commands:
-                self.run_with_periodic_commands()
-            else:
-                self.run_only_queue()
+            self.start()
+            
+            # it seems that calling self._shutdown.wait() here prevents the
+            # signal handler from executing
+            while not self._shutdown.is_set():
+                self._shutdown.wait(.1)
         except:
             self.logger.error('error', exc_info=1)
+            self.shutdown()
+        
+        self.logger.info('Shutdown...')
