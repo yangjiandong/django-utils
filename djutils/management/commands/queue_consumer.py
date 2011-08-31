@@ -144,8 +144,6 @@ class Command(BaseCommand):
             except:
                 self.logger.error('Error enqueueing periodic commands', exc_info=1)
             
-            end = time.time()
-            
             time.sleep(60 - (time.time() - start))
     
     def start_processor(self):
@@ -188,11 +186,11 @@ class Command(BaseCommand):
         for job in self._queue:
             # spin up a worker with the given job
             self.spawn(self.worker, job)
-            
-            # indicate receipt of the task
-            self._queue.task_done()
     
-    def worker(self, message):
+    def worker(self, message):        
+        # indicate receipt of the task
+        self._queue.task_done()
+        
         try:
             command = registry.get_command_for_message(message)
             command.execute()
@@ -226,9 +224,7 @@ class Command(BaseCommand):
     
     def handle(self, *args, **options):
         """
-        Entry-point of the consumer -- in what might be a premature optimization,
-        I've chosen to keep the code paths separate depending on whether the
-        periodic command thread is started.
+        Entry-point of the consumer
         """
         autodiscover()
         
