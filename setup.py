@@ -30,5 +30,5 @@ setup(
         'Framework :: Django',
     ],
     test_suite='runtests.runtests',
-    tests_require=['pygments', 'PIL', 'httplib2'],
+    tests_require=['pygments', 'PIL>=0.1.5', 'httplib2'],
 )
