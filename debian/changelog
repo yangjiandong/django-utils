@@ -1,0 +1,5 @@
+python-django-utils (0.3.2) unstable; urgency=low
+
+  * Initial packaging
+
+ -- Joe Stump <joe@joestump.net>  Mon, 28 Nov 2011 13:48:21 +0000
