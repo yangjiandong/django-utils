@@ -8,5 +8,5 @@ Homepage: https://github.com/coleifer/django-utils
 
 Package: python-django-utils
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5), python-django (>= 1.2.0), python-imaging
+Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5), python-django (>= 1.2.0), python-imaging, libjpeg62
 Description: A collection of tools to help with Django development.
