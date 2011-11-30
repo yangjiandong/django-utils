@@ -32,13 +32,9 @@ License:
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
     DEALINGS IN THE SOFTWARE.
 
-On Debian systems, the complete text of the BSD License can be
-found in `/usr/share/common-licenses/BSD'.
-
 The Debian packaging is:
 
     Copyright (C) 2011 Joe Stump <joe@joestump.net>
 
-and is licensed under the GPL version 3, 
-see `/usr/share/common-licenses/GPL-3'.
-
+and is licensed under the MIT, 
+see `http://www.opensource.org/licenses/mit-license.php'.
