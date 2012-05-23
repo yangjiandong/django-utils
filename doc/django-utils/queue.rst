@@ -3,6 +3,11 @@ Queue
 
 .. py:module:: djutils.queue
 
+
+.. warning::
+    This project is no longer being maintained.  Please check out
+    huey (https://github.com/coleifer/huey.git) for the replacement.
+
 A simple task queue and consumer to make processing tasks out-of-band painless.
 Ideal for sending email, checking items for spam, generating thumbnails, etc.
 
